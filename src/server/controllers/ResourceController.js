@@ -1,5 +1,7 @@
 
+import _ from 'lodash';
 import * as web from 'express-decorators';
+import {NotFoundError} from '../lib/errors';
 import requireAll from 'require-all';
 
 
@@ -13,31 +15,34 @@ export default class ResourceController {
     });
   }
 
-  resourceMiddleware(request, response, next) {
-    let resourceDescription = this.resources[request.params.resource];
 
-    if (!resourceDescription) {
-      response
-        .status(404)
-        .json({
-          error: {
-            title: 'Not found',
-            detail: `Unknown resource "${request.params.resource}"`
-          },
-          meta: {
-            resource: request.params.resource
-          }
-        });
+  @param('resource')
+  resourceParam(request, response, next, resource) {
+    request.resource = this.resources[resource];
 
-    } else {
-      request.resourceDescription = resourceDescription;
-      next();
+    if (!request.resource) {
+      throw new NotFoundError(`Unknown resource "${resource}"`);
     }
+
+    next();
   }
 
   @web.get('/:resource')
-  @web.middleware('resourceMiddleware')
   async retrieveResourcesAction(request, response) {
+    let query = request.resource.Model;
+
+    if (request.query.filter) {
+      query = query.filter(_.mapValues(request.query.filter, JSON.parse));
+    }
+
+    if (request.query.fields && request.query.fields[request.param.resource]) {
+      query = query.pluck(request.query.fields.spli(','));
+    }
+
+    if (request.query.sort) {
+      let orderBy = {};
+    }
+
     let resources = await request.resourceDescription.Model.run();
   }
 };
